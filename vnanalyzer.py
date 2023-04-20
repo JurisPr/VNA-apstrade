@@ -57,6 +57,18 @@ class SQLiteSession:
             )""")
         print('tables created')
 
+    def create_tables_sample_N(self):
+        self.cur.execute(f"""DROP TABLE IF EXISTS {c.FILE_TABLE}""")
+        print(f"old {c.FILE_TABLE} table deleted")
+        self.cur.execute(f"""CREATE TABLE IF NOT EXISTS {c.FILE_TABLE}(
+            {c.COL_MEMBER_FILE_NAME} TEXT PRIMARY KEY,
+            {c.COL_KELVIN} FLOAT NOT NULL,
+            {c.COL_VGATE} FLOAT NOT NULL,
+            {c.COL_V_SOURCE_DRAIN} FLOAT NOT NULL,
+            {c.COL_SAMPLE_ID} TEXT NOT NULL
+            )""")
+        print(f"new {c.FILE_TABLE} table created")
+
 
 def open_SQLiteSession(dbfilename):
     global db
@@ -142,6 +154,80 @@ def fill_files_table():
                            [member_file_name, kelvin, vGate])
 
 
+def fill_files_table_sample_N():
+    for member_file_name in zip.zf.namelist():
+        kelvin = None
+        vGate = None
+        vSourceDrain = None
+        sampleID = None
+        if not member_file_name.endswith(".csv"):
+            continue
+
+        if '_9K' in member_file_name:
+            kelvin = 9.0
+        elif '_8K' in member_file_name:
+            kelvin = 8.0
+        elif '_6K' in member_file_name:
+            kelvin = 6.0
+
+        if 'Usd_0p05V' in member_file_name:
+            vSourceDrain = 0.05
+        elif 'Usd_0p04V' in member_file_name:
+            vSourceDrain = 0.04
+
+        if 'Ug0p0V' in member_file_name:
+            vGate = 0.0
+        elif 'Ug-8p0V' in member_file_name:
+            vGate = -8.0
+        elif 'Ug-7p0V' in member_file_name:
+            vGate = -7.0
+        elif 'Ug-6p0V' in member_file_name:
+            vGate = -6.0
+        elif 'Ug-5p0V' in member_file_name:
+            vGate = -5.0
+        elif 'Ug-4p0V' in member_file_name:
+            vGate = -4.0
+        elif 'Ug-3p0V' in member_file_name:
+            vGate = -3.0
+        elif 'Ug-2p0V' in member_file_name:
+            vGate = -2.0
+        elif 'Ug-1p0V' in member_file_name:
+            vGate = -1.0
+        elif 'Ug8p0V' in member_file_name:
+            vGate = 8.0
+        elif 'Ug7p0V' in member_file_name:
+            vGate = 7.0
+        elif 'Ug6p0V' in member_file_name:
+            vGate = 6.0
+        elif 'Ug5p0V' in member_file_name:
+            vGate = 5.0
+        elif 'Ug4p0V' in member_file_name:
+            vGate = 4.0
+        elif 'Ug3p0V' in member_file_name:
+            vGate = 3.0
+        elif 'Ug2p0V' in member_file_name:
+            vGate = 2.0
+        elif 'Ug1p0V' in member_file_name:
+            vGate = 1.0
+        elif 'Ug3p0V' in member_file_name:
+            vGate = 3.0
+
+        if 'Planais' in member_file_name:
+            sampleID = 'Planais'
+        elif 'nowire' in member_file_name:
+            sampleID = 'nowire'
+        elif '0677uA.' in member_file_name or '0659uA.' in member_file_name:
+            sampleID = 'sample_N'
+
+        if kelvin is None or vGate is None or vSourceDrain is None or sampleID is None:
+            print(f"member_file_name = {member_file_name}")
+        else:
+            db.cur.execute(f"""INSERT INTO {c.FILE_TABLE}
+                    ({c.COL_MEMBER_FILE_NAME},{c.COL_KELVIN},{c.COL_VGATE},{c.COL_V_SOURCE_DRAIN},{c.COL_SAMPLE_ID})
+                    VALUES (?,?,?,?,?)""",
+                           [member_file_name, kelvin, vGate, vSourceDrain, sampleID])
+
+
 temperatures = []
 
 
@@ -154,6 +240,27 @@ def select_distinct_temperatures():
             """)
     for sel_kelvin in db.cur.fetchall():
         temperatures.append(sel_kelvin[0])
+    print(temperatures)
+
+
+sample_IDs = []
+
+
+def select_distinct_sample_IDs():
+    global sample_IDs
+    db.cur.execute(f"""SELECT DISTINCT
+                    {c.COL_SAMPLE_ID}
+            FROM    {c.FILE_TABLE}
+            ORDER BY {c.COL_SAMPLE_ID}
+            """)
+    for sel_id in db.cur.fetchall():
+        sample_IDs.append(sel_id[0])
+    print(sample_IDs)
+
+
+#            {c.COL_VGATE} FLOAT NOT NULL,
+#            {c.COL_V_SOURCE_DRAIN} FLOAT NOT NULL,
+#            {c.COL_SAMPLE_ID} TEXT NOT NULL
 
 
 def load_csv(member_file_name):
@@ -174,6 +281,34 @@ def load_csv(member_file_name):
     return {'col1': col1,
             'col2': col2,
             'col3': col3}
+
+
+def plot_spectra_sample_N():
+    page_no = 2000
+    for sample_id in sample_IDs:
+        db.cur.execute(f"""SELECT DISTINCT
+                    {c.COL_KELVIN}
+            FROM    {c.FILE_TABLE}
+            WHERE {c.COL_SAMPLE_ID} = ?
+            ORDER BY {c.COL_KELVIN}
+            """, [sample_id])
+        temps_k = []
+        for sel_k in db.cur.fetchall():
+            temps_k.append(sel_k[0])
+        for kelvin in temps_k:
+            db.cur.execute(f"""SELECT
+                    {c.COL_MEMBER_FILE_NAME},
+                    {c.COL_VGATE}
+            FROM    {c.FILE_TABLE}
+            WHERE {c.COL_KELVIN} = ? AND {c.COL_SAMPLE_ID} = ?
+            ORDER BY {c.COL_VGATE}
+            """, [kelvin, sample_id])
+
+
+#
+#
+#
+#
 
 
 def plot_spectra():
@@ -253,6 +388,6 @@ def plot_spectra():
         plt.close()
 
 
-def combine_pdf_files():
+def combine_pdf_files(pdffilename):
     check_output(
-            f"pdftk {OUTFOLDER}\\*.pdf cat output {OUTFOLDER}\\1all_spectra.pdf", shell=True).decode()
+        f"pdftk {OUTFOLDER}\\*.pdf cat output {OUTFOLDER}\\{pdffilename}", shell=True).decode()
