@@ -14,7 +14,7 @@ def process_X_d3():
 
 
 def process_sample_N():
-    h.open_ZipSession('data_in/Jurim_sample_N.zip')
+    h.open_ZipSession('data_in/2023-03-14_013_N.zip')
     h.open_SQLiteSession('sample_N.sqlite3')
     h.db.create_tables_sample_N()
     # h.show_zip_contents()
@@ -22,6 +22,8 @@ def process_sample_N():
 #    h.select_distinct_temperatures()
     h.select_distinct_sample_IDs()
     h.plot_spectra_sample_N()
+    h.plot_analysis_sample_N()
+    h.combine_pdf_files('sample_N.pdf')
 
 
 def main():
