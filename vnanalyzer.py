@@ -90,6 +90,7 @@ def fill_files_table():
         kelvin = None
         vGate = None
 
+
 #        if '211'in member_file_name:
 #            continue
 
@@ -159,11 +160,19 @@ def fill_files_table():
 
 
 def fill_files_table_sample_N():
+    global xfile
+
     for member_file_name in zip.zf.namelist():
+
         kelvin = None
         vGate = None
         vSourceDrain = None
         sampleID = None
+
+        if "237_supp15V_Ug0p0V_Ig0p01nA__Usd_0p05V_po0_9K+Isd_025uA" in member_file_name:
+            xfile = member_file_name
+            print(xfile)
+
         if not member_file_name.endswith(".csv"):
             continue
         if '050_' in member_file_name:
@@ -335,7 +344,7 @@ def plot_spectra_sample_N():
                         {c.COL_VGATE}
                 FROM    {c.FILE_TABLE}
                 WHERE {c.COL_KELVIN} = ? AND {c.COL_SAMPLE_ID} = ?
-                ORDER BY {c.COL_VGATE}
+                ORDER BY {c.COL_VGATE} DESC
                 """, [kelvin, sample_id])
             sel_file_vgates = db.cur.fetchall()
             sum = None
@@ -396,6 +405,12 @@ def plot_spectra_sample_N():
                     sum = np.array(dB)
                 else:
                     sum += dB
+
+            xcsv = load_csv(xfile)
+            xf = np.array(xcsv['col1'])*1E-6
+            xdB = xcsv['col2']
+            ax_db.plot(
+                xf, xdB, '--', label=xfile.split('/')[1][:10], color='k')
 
             mean = sum/len(sel_file_vgates)
             for sel_file_vgate in sel_file_vgates:
@@ -499,16 +514,33 @@ def plot_analysis_sample_N():
         else:
             ax_db, ax_f = ax_db6, ax_f6
 
-        ax_db.plot (vGate,peak_dB)
+        ax_db.plot(vGate, peak_dB, "o", color='k')
+        p = np.polyfit(vGate, peak_dB, 1)
+        rho = np.corrcoef(vGate, peak_dB)
+        vGends = [vGate[0], vGate[-1]]
+        dBends = np.polyval(p, vGends)
+        ax_db.plot(vGends, dBends, color='k')
+        ax_db.text(vGends[0], dBends[1], "$\\rho$ = " +
+                   "{:.3f}".format(rho[0, 1]), size=10)
+
         ax_db.title.set_text(f"T={sel_kelvin[0]}")
+
         ax_db.set(ylabel='A, dB')
-        ax_f.plot (vGate,peak_MHz)
+        ax_f.plot(vGate, peak_MHz, "o", color='k')
+
+        pf = np.polyfit(vGate, peak_MHz, 1)
+        rhof = np.corrcoef(vGate, peak_MHz)
+        vGendsf = [vGate[0], vGate[-1]]
+        fends = np.polyval(pf, vGendsf)
+        ax_f.plot(vGendsf, fends, color='k')
+        ax_f.text(vGendsf[0], fends[1], "$\\rho$ = " +
+                  "{:.3f}".format(rhof[0, 1]), size=10)
+
         ax_f.title.set_text(f"T={sel_kelvin[0]}")
-        ax_f.set(ylabel='f, MHz')   
+        ax_f.set(ylabel='f, MHz')
     for ax in axs:
         ax.grid()
         ax.set(xlabel='$V_g$, V')
-
 
     plt.tight_layout()
 #            plt.show()
@@ -601,3 +633,106 @@ def plot_spectra():
 def combine_pdf_files(pdffilename):
     check_output(
         f"pdftk {OUTFOLDER}\\*.pdf cat output {pdffilename}", shell=True).decode()
+
+matrix = {}
+
+def plot_cor_no_f():
+    global page_no
+    page_no += 1
+    fig = plt.figure()
+    plt.rcParams.update({'font.size': 8})
+    fig.set_figheight(c.A4_short_in)
+    fig.set_figwidth(c.A4_long_in)
+    subplot_shape = (2, 4)
+
+    ax_db_6 = plt.subplot2grid(
+        shape=subplot_shape, loc=(0, 0), colspan=2, rowspan=1)
+    ax_db_8 = plt.subplot2grid(
+        shape=subplot_shape, loc=(0, 2), colspan=2, rowspan=1)
+
+    ax_ang_6 = plt.subplot2grid(
+        shape=subplot_shape, loc=(1, 0), colspan=2, rowspan=1)
+    ax_ang_8 = plt.subplot2grid(
+        shape=subplot_shape, loc=(1, 2), colspan=2, rowspan=1)
+
+    axs = (ax_db_6, ax_db_8, ax_ang_6, ax_ang_8)
+
+    sample_id = 'sample_N'
+    print("++++++++++++++++++ plot_cor_no_f")
+    db.cur.execute(f"""SELECT DISTINCT
+                    {c.COL_KELVIN}
+            FROM    {c.FILE_TABLE}
+            WHERE {c.COL_SAMPLE_ID} = ?
+            ORDER BY {c.COL_KELVIN}
+            """, [sample_id])
+    ax_num = -1
+    for sel_kelvin in db.cur.fetchall():
+        ax_num += 1
+        kelvin = sel_kelvin[0]
+        print(kelvin)
+        matrix[kelvin] = {}
+        db.cur.execute(f"""SELECT
+                    {c.COL_MEMBER_FILE_NAME},
+                    {c.COL_VGATE}
+            FROM    {c.FILE_TABLE}
+            WHERE {c.COL_KELVIN} = ? AND {c.COL_SAMPLE_ID} = ?
+            ORDER BY {c.COL_VGATE} DESC
+            """, [kelvin, sample_id])
+        sel_file_vgates = db.cur.fetchall()
+        matrix[kelvin]['Vg'] = []
+        matrix[kelvin]['dB'] = []
+        matrix[kelvin]['ang'] = []
+        matrix[kelvin]['f'] = []
+        matrix[kelvin]['rho_dB'] = []
+        matrix[kelvin]['rho_ang'] = []
+
+        for sel_file_vgate in sel_file_vgates:
+            member_file_name = sel_file_vgate[0]
+            print(member_file_name)
+            vGate = sel_file_vgate[1]
+            matrix[kelvin]['Vg'].append(vGate)
+            matrix[kelvin]['dB'].append([])
+            matrix[kelvin]['ang'].append([])
+            csv = load_csv(member_file_name)
+            f_Hz = csv['col1']
+            dB = csv['col2']
+            ang = csv['col3']
+            for i in range(len(f_Hz)):
+                matrix[kelvin]['dB'][-1].append(dB[i])
+                matrix[kelvin]['ang'][-1].append(ang[i])
+        for i in range(len(f_Hz)):
+            matrix[kelvin]['f'].append(f_Hz[i]*1E-6)
+            x_Vg = []
+            y_dB = []
+            y_ang = []
+            for k in range(len(matrix[kelvin]['Vg'])):
+                x_Vg.append(matrix[kelvin]['Vg'][k])
+                y_dB.append(matrix[kelvin]['dB'][k][i])
+                y_ang.append(matrix[kelvin]['ang'][k][i])
+            rho_dB = np.corrcoef(x_Vg, y_dB)
+            matrix[kelvin]['rho_dB'].append(rho_dB[0, 1])
+            rho_ang = np.corrcoef(x_Vg, y_ang)
+            matrix[kelvin]['rho_ang'].append(rho_ang[0, 1])
+
+        axs[ax_num].plot(matrix[kelvin]['f'], matrix[kelvin]['rho_dB'])
+        axs[ax_num].set(ylabel=r'$\rho_{A}$')
+
+        axs[ax_num+2].plot(matrix[kelvin]['f'], matrix[kelvin]['rho_ang'])
+        axs[ax_num+2].set(ylabel=r'$\rho_{\phi}$')
+
+        axs[ax_num].title.set_text(f"Vg - Amplitude correlation, T={sel_kelvin[0]}")
+        axs[ax_num+2].title.set_text(f"Vg - Pase correlation, T={sel_kelvin[0]}")
+
+    for ax in axs:
+        ax.grid()
+        ax.set(xlabel='$f$, MHz')
+        ax.set(xlim=[min(matrix[kelvin]['f']), max(matrix[kelvin]['f'])])
+        ax.set(ylim=[-1, 1])
+
+    plt.tight_layout()
+#            plt.show()
+
+    plt.savefig(f"{OUTFOLDER}/page{page_no}.pdf", dpi=c.DPI)
+    plt.close()
+
+    # print(matrix)
