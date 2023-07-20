@@ -1,5 +1,7 @@
 import apstrada
 
+MDPI_W_in = 5.5
+
 if __name__ == "__main__":
     apstrada.main()
 
@@ -16,3 +18,4 @@ COL_PEAK_DB = 'peak_dB'
 A4_short_in = 8.27
 A4_long_in = 11.69
 DPI = 300
+

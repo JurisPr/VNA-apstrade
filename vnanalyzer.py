@@ -8,7 +8,7 @@ import numpy as np
 from subprocess import check_output
 import matplotlib.cm as cm
 from scipy import interpolate
-
+import math
 if __name__ == "__main__":
     apstrada.main()
 
@@ -198,6 +198,12 @@ def fill_files_table_sample_N():
 
         if 'Ug0p0V' in member_file_name:
             vGate = 0.0
+            print(f"XXXXXXXXXXXXXXXXXXXXXXXXX{member_file_name}")
+            if '018_supp15V_Ug0p0V_Ig_Usd_0p04V_po0_8K' in member_file_name:
+                continue
+            if '007_supp15V_Ug0p0V_Ig_Usd_0p04V_po0_6K' in member_file_name:
+                continue
+
         elif 'Ug-8p0V' in member_file_name:
             vGate = -8.0
         elif 'Ug-7p0V' in member_file_name:
@@ -310,6 +316,11 @@ page_no = 2000
 
 def plot_spectra_sample_N():
     global page_no
+    global figwidth
+    global figheight
+    figwidth = c.MDPI_W_in
+    figheight = figwidth/math.sqrt(2)
+
     for sample_id in sample_IDs:
         db.cur.execute(f"""SELECT DISTINCT
                     {c.COL_KELVIN}
@@ -323,19 +334,25 @@ def plot_spectra_sample_N():
         for kelvin in temps_k:
             page_no += 1
             fig = plt.figure()
-            plt.rcParams.update({'font.size': 8})
-            fig.set_figheight(c.A4_short_in)
-            fig.set_figwidth(c.A4_long_in)
+            plt.rcParams.update({'font.size': 7})
+            fig.set_figheight(figheight*1.35)
+            fig.set_figwidth(figwidth)
             subplot_shape = (2, 4)
 
             ax_db = plt.subplot2grid(
                 shape=subplot_shape, loc=(0, 0), colspan=2, rowspan=1)
             ax_delta = plt.subplot2grid(
                 shape=subplot_shape, loc=(0, 2), colspan=2, rowspan=1)
-            ax_ang = plt.subplot2grid(
-                shape=subplot_shape, loc=(1, 2), colspan=2, rowspan=1)
-            ax_zoomin = plt.subplot2grid(
-                shape=subplot_shape, loc=(1, 0), colspan=2, rowspan=1)
+#            ax_ang = plt.subplot2grid(
+#                shape=subplot_shape, loc=(1, 2), colspan=2, rowspan=1)
+#            ax_zoomin = plt.subplot2grid(
+#                shape=subplot_shape, loc=(1, 0), colspan=2, rowspan=1)
+
+            left1, bottom1, width1, height1 = [0.201, 0.58, 0.199, 0.22]
+            ax_zoomin = fig.add_axes([left1, bottom1, width1, height1])
+
+            left2, bottom2, width2, height2 = [0.59, 0.59, 0.2, 0.26]
+            ax_ang = fig.add_axes([left2, bottom2, width2, height2])
 
             axs = (ax_db, ax_delta, ax_ang, ax_zoomin)
 
@@ -348,6 +365,8 @@ def plot_spectra_sample_N():
                 """, [kelvin, sample_id])
             sel_file_vgates = db.cur.fetchall()
             sum = None
+            lw = 0.6
+
             for sel_file_vgate in sel_file_vgates:
                 member_file_name = sel_file_vgate[0]
                 #print (member_file_name)
@@ -358,7 +377,7 @@ def plot_spectra_sample_N():
                 dB = csv['col2']
                 ang = csv['col3']
                 ax_db.plot(
-                    f, dB, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5))
+                    f, dB, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5), linewidth=lw)
 
                 f_min, f_max = 1.48, 1.58
                 peak_i = np.where((f >= f_min) & (f <= f_max))
@@ -379,8 +398,9 @@ def plot_spectra_sample_N():
                     print(real_roots_i)
                     f_0 = np.real(r1[real_roots_i][0])
                     db_0 = np.polyval(p, f_0)
+
                     ax_zoomin.plot(
-                        f_0, db_0, '+', color=cm.jet(vGate/16.0+0.5))
+                        f_0, db_0, '+', color=cm.jet(vGate/16.0+0.5), markersize=5)
 
                     db.cur.execute(f"""UPDATE {c.FILE_TABLE}
                             SET
@@ -397,7 +417,7 @@ def plot_spectra_sample_N():
 #                db_peak=np.interp(f_peak,f, dB,)
 
                 ax_zoomin.plot(
-                    f_peak, db_peak, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5))
+                    f_peak, db_peak, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5), linewidth=lw)
 
                 print(peak_i)
 
@@ -409,8 +429,8 @@ def plot_spectra_sample_N():
             xcsv = load_csv(xfile)
             xf = np.array(xcsv['col1'])*1E-6
             xdB = xcsv['col2']
-            ax_db.plot(
-                xf, xdB, '--', label=xfile.split('/')[1][:10], color='k')
+#            ax_db.plot(
+#                xf, xdB, '--', label=xfile.split('/')[1][:10], color='k', linewidth=lw)
 
             mean = sum/len(sel_file_vgates)
             for sel_file_vgate in sel_file_vgates:
@@ -423,40 +443,48 @@ def plot_spectra_sample_N():
                 delta = dB-mean
 
                 ax_delta.plot(
-                    f, delta, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5))
+                    f, delta, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5), linewidth=lw)
 
                 ax_ang.plot(
-                    f, delta, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5))
+                    f, delta, label=f"Vg={vGate}V", color=cm.jet(vGate/16.0+0.5), linewidth=lw)
 
                 ax_zoomin.plot(
-                    f, dB, '.', color=cm.jet(vGate/16.0+0.5))  # , label=f"Vg={vGate}V"
+                    f, dB, '.', color=cm.jet(vGate/16.0+0.5), markersize=2)  # , label=f"Vg={vGate}V"
 
             subplot_titles = (
-                f"T={kelvin}K", 'subtracted mean', "Zoom in Delta", "Zoom in")
+                f"(a)", '(b)', "Zoom in Delta", "Zoom in")
             y_labels = ('A, dB', 'ΔA, dB', 'ΔA, dB', 'A, dB')
 
             for ref_type_n in range(4):
-                axs[ref_type_n].set(xlabel='$f$, MHz')
-                axs[ref_type_n].title.set_text(subplot_titles[ref_type_n])
-                axs[ref_type_n].set(ylabel=y_labels[ref_type_n])
-                axs[ref_type_n].legend(loc="best")
-                axs[ref_type_n].grid()
+                if ref_type_n == 0 or ref_type_n == 1:
+                    axs[ref_type_n].set(xlabel='$f$, MHz')
+                    axs[ref_type_n].set_title(
+                        subplot_titles[ref_type_n], x=-0.19, y=1.0, pad=-11,fontweight='bold')
+#                    axs[ref_type_n].title.set_text(subplot_titles[ref_type_n], y=1.0, pad=-14)
+ #                   axs[ref_type_n].title.set
+                    axs[ref_type_n].set(ylabel=y_labels[ref_type_n])
+                    # axs[ref_type_n].legend(loc="best")
+                else:
+                    axs[ref_type_n].grid()
 
                 if ref_type_n == 2:
                     axs[ref_type_n].set(xlim=[1, 2])
                     axs[ref_type_n].set(ylim=[-0.5, 0.5])
                 elif ref_type_n == 3:
-                    axs[ref_type_n].set(xlim=[1.475, 1.6])
-                    axs[ref_type_n].set(ylim=[-43.5, -40])
+                    axs[ref_type_n].set(xlim=[1.5, 1.545])
+                    axs[ref_type_n].set(ylim=[-43.4, -40.9])
                 else:
+                    #                    axs[ref_type_n].set(
+                    #                        xlim=[min(f), max(f)])
                     axs[ref_type_n].set(
-                        xlim=[min(f), max(f)])
+                        xlim=[min(f), 10])
 
                 if ref_type_n == 0:
                     axs[ref_type_n].set(ylim=[-50, -10])
                 if ref_type_n == 1:
-                    axs[ref_type_n].set(ylim=[-3.5, 3.5])
-
+                    axs[ref_type_n].set(ylim=[-3.5, 0.5])
+            ax_zoomin.yaxis.set_ticks(np.arange(-43, -40, 1))
+            ax_delta.legend(loc='center left', bbox_to_anchor=(1.02, 0.43))
             plt.tight_layout()
 #            plt.show()
 
@@ -469,8 +497,8 @@ def plot_analysis_sample_N():
     page_no += 1
     fig = plt.figure()
     plt.rcParams.update({'font.size': 8})
-    fig.set_figheight(c.A4_short_in)
-    fig.set_figwidth(c.A4_long_in)
+    fig.set_figheight(figheight)
+    fig.set_figwidth(figwidth)
     subplot_shape = (2, 4)
 
     ax_db6 = plt.subplot2grid(
@@ -559,8 +587,8 @@ def plot_spectra():
         page_no += 1
         fig = plt.figure()
         plt.rcParams.update({'font.size': 8})
-        fig.set_figheight(c.A4_short_in)
-        fig.set_figwidth(c.A4_long_in)
+        fig.set_figheight(figheight)
+        fig.set_figwidth(figwidth)
         subplot_shape = (2, 4)
 
         ax_db = plt.subplot2grid(
@@ -634,15 +662,17 @@ def combine_pdf_files(pdffilename):
     check_output(
         f"pdftk {OUTFOLDER}\\*.pdf cat output {pdffilename}", shell=True).decode()
 
+
 matrix = {}
+
 
 def plot_cor_no_f():
     global page_no
     page_no += 1
     fig = plt.figure()
     plt.rcParams.update({'font.size': 8})
-    fig.set_figheight(c.A4_short_in)
-    fig.set_figwidth(c.A4_long_in)
+    fig.set_figheight(figheight)
+    fig.set_figwidth(figwidth)
     subplot_shape = (2, 4)
 
     ax_db_6 = plt.subplot2grid(
@@ -720,8 +750,10 @@ def plot_cor_no_f():
         axs[ax_num+2].plot(matrix[kelvin]['f'], matrix[kelvin]['rho_ang'])
         axs[ax_num+2].set(ylabel=r'$\rho_{\phi}$')
 
-        axs[ax_num].title.set_text(f"Vg - Amplitude correlation, T={sel_kelvin[0]}")
-        axs[ax_num+2].title.set_text(f"Vg - Pase correlation, T={sel_kelvin[0]}")
+        axs[ax_num].title.set_text(
+            f"Vg - Amplitude correlation, T={sel_kelvin[0]}")
+        axs[ax_num +
+            2].title.set_text(f"Vg - Pase correlation, T={sel_kelvin[0]}")
 
     for ax in axs:
         ax.grid()
