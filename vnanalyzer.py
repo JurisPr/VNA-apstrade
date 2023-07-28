@@ -459,7 +459,7 @@ def plot_spectra_sample_N():
                 if ref_type_n == 0 or ref_type_n == 1:
                     axs[ref_type_n].set(xlabel='$f$, MHz')
                     axs[ref_type_n].set_title(
-                        subplot_titles[ref_type_n], x=-0.19, y=1.0, pad=-11,fontweight='bold')
+                        subplot_titles[ref_type_n], x=-0.19, y=1.0, pad=-11, fontweight='bold')
 #                    axs[ref_type_n].title.set_text(subplot_titles[ref_type_n], y=1.0, pad=-14)
  #                   axs[ref_type_n].title.set
                     axs[ref_type_n].set(ylabel=y_labels[ref_type_n])
@@ -579,6 +579,112 @@ def plot_analysis_sample_N():
 #
 #
 #
+########################################################
+
+
+def plot_analysis_sample_N_only8K():
+    global page_no
+    page_no += 1
+    fig = plt.figure()
+    plt.rcParams.update({'font.size': 7})
+    fig.set_figheight(figheight)
+    fig.set_figwidth(figwidth)
+    subplot_shape = (2, 4)
+
+#    ax_db6 = plt.subplot2grid(
+#        shape=subplot_shape, loc=(0, 0), colspan=2, rowspan=1)
+#    ax_f6 = plt.subplot2grid(
+#        shape=subplot_shape, loc=(0, 2), colspan=2, rowspan=1)
+    ax_db8 = plt.subplot2grid(
+        shape=subplot_shape, loc=(1, 0), colspan=2, rowspan=1)
+    ax_f8 = plt.subplot2grid(
+        shape=subplot_shape, loc=(1, 2), colspan=2, rowspan=1)
+
+    axs = (
+        #ax_db6, ax_f6,
+        ax_db8, ax_f8)
+
+    sample_id = 'sample_N'
+    db.cur.execute(f"""SELECT DISTINCT
+                    {c.COL_KELVIN}
+            FROM    {c.FILE_TABLE}
+            WHERE {c.COL_SAMPLE_ID} = ?
+            ORDER BY {c.COL_KELVIN}
+            """, [sample_id])
+    for sel_kelvin in db.cur.fetchall():
+        db.cur.execute(f"""SELECT
+                        {c.COL_VGATE},
+                        {c.COL_PEAK_MHZ},
+                        {c.COL_PEAK_DB}
+                FROM    {c.FILE_TABLE}
+                WHERE {c.COL_KELVIN} = ? AND {c.COL_SAMPLE_ID} = ?
+                ORDER BY {c.COL_VGATE}
+                """, [sel_kelvin[0], sample_id])
+        vGate = []
+        peak_MHz = []
+        peak_dB = []
+        for rez in db.cur.fetchall():
+            vGate.append(rez[0])
+            peak_MHz.append(rez[1])
+            peak_dB.append(rez[2])
+
+        print(sel_kelvin[0])
+        if sel_kelvin[0] == 8.0:
+            ax_db, ax_f = ax_db8, ax_f8
+        else:
+            continue
+            #ax_db, ax_f = ax_db6, ax_f6
+
+        ax_db.plot(vGate, peak_dB, ".", color='k')
+        p = np.polyfit(vGate, peak_dB, 1)
+        rho = np.corrcoef(vGate, peak_dB)
+        vGends = [vGate[0], vGate[-1]]
+        dBends = np.polyval(p, vGends)
+        print(f"SSSSSSSSSSSSSLOPE{p}")
+        ax_db.plot(vGends, dBends, color='k')
+        ax_db.text(vGends[0]+1.1, dBends[1]-(dBends[1]-dBends[0])/8, "$\\rho$ = " +
+                   "{:.3f}".format(rho[0, 1]), size=8)
+
+        ax_db.text(vGends[0]+0.3, dBends[1]-(dBends[1]-dBends[0])/4, "slope " +
+                   "{:.3f}".format(p[0]) + " dB/V", size=8)
+
+        # ax_db.title.set_text(f"T={sel_kelvin[0]}")
+        ax_db.yaxis.set_ticks(np.arange(-43.2, -42.6, 0.2))
+
+        ax_db.set_title("(a)", x=-0.19, y=1.0, pad=-20, fontweight='bold')
+
+        ax_db.set(ylabel='A, dB')
+        ax_f.plot(vGate, peak_MHz, ".", color='k')
+
+        pf = np.polyfit(vGate, peak_MHz, 1)
+        rhof = np.corrcoef(vGate, peak_MHz)
+        vGendsf = [vGate[0], vGate[-1]]
+        fends = np.polyval(pf, vGendsf)
+        print(f"FFFFFFFFFFFFFFFFF_SLOPE{pf}")
+        print(f"KKKKKKKKKKKKKKKKKKK_SLOPE{pf[0]*1000}")
+
+        ax_f.plot(vGendsf, fends, color='k')
+        ax_f.text(vGendsf[0]+1.1, fends[1]-(fends[1]-fends[0])/4, "$\\rho$ = " +
+                  "{:.3f}".format(rhof[0, 1]), size=8)
+
+        ax_f.text(vGends[0]+0.3, fends[1]-(fends[1]-fends[0])/4-(fends[1]-fends[0])/8, "slope " +
+                  "{:.0f}".format(pf[0]*1000000) + " Hz/V", size=8)
+
+        #ax_f.title.set_text(f"T={sel_kelvin[0]}")
+#       ax_f.yaxis.set_ticks(np.arange(-43, -40, 1))
+        ax_f.yaxis.set_ticks([1.5225, 1.5230, 1.5235, 1.5240])
+        ax_f.set_title("(b)", x=-0.19, y=1.0, pad=-11, fontweight='bold')
+
+        ax_f.set(ylabel='f, MHz')
+    for ax in axs:
+        ax.grid()
+        ax.set(xlabel='$V_g$, V')
+
+    plt.tight_layout()
+#            plt.show()
+
+    plt.savefig(f"{OUTFOLDER}/page{page_no}.pdf", dpi=c.DPI)
+    plt.close()
 
 
 def plot_spectra():

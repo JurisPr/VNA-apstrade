@@ -23,6 +23,7 @@ def process_sample_N():
     h.select_distinct_sample_IDs()
     h.plot_spectra_sample_N()
     h.plot_analysis_sample_N()
+    h.plot_analysis_sample_N_only8K()
     h.plot_cor_no_f()
 
     h.combine_pdf_files('sample_N.pdf')
